@@ -1,61 +1,75 @@
-# OpenTelemetry Integration One-Pager
+# OpenTelemetry Integration Guide
 
-## Purpose
+## What This Adds
 
-The Week 4 customer support notebook already builds a LangGraph classifier, traces runs in LangSmith, computes accuracy, exports CSVs, and compares a baseline prompt against an improved prompt. OpenTelemetry is added as the standard tracing layer underneath that workflow. It does not replace LangSmith. It makes each evaluation run structured, portable, and easier to explain.
+The Week 4 notebook evaluates a customer support classifier. It runs tickets through a baseline prompt, compares predictions against known labels, improves the prompt, and measures whether the new version performs better.
 
-## Plain-English Explanation
+OpenTelemetry adds trace-level visibility to that workflow.
 
-LangSmith is the AI evaluation workspace: it stores traces, shows LLM calls, helps inspect failures, and supports baseline-vs-improved comparison.
+In plain English: every ticket classification becomes a traceable event. That event records what the model was asked to do, what it predicted, what the correct answer was, and whether the prediction was right.
 
-OpenTelemetry is the instrumentation standard: it defines how code emits traces and metadata.
+## OpenTelemetry vs. LangSmith
 
-In this project, OpenTelemetry gives every ticket classification a trace with useful evaluation context. LangSmith receives those traces so we can debug and report them.
+LangSmith is the place where you inspect AI runs, prompts, model calls, and eval results.
 
-## Where It Fits In The Notebook
+OpenTelemetry is the standard way the notebook emits trace data.
 
-The best integration point is the `run_predictions(agent, tickets)` loop. That function calls `agent.invoke(...)` once per support ticket and records:
+They work together here:
 
-- `true_category`
-- `predicted_category`
-- `reasoning`
-- `correct`
+- OpenTelemetry captures structured spans from the notebook.
+- LangSmith receives those spans and gives you a UI for reviewing them.
 
-The OpenTelemetry version wraps each ticket prediction in a span named `customer_support.classify_ticket`, then attaches evaluation metadata to that span.
+So OpenTelemetry does not replace LangSmith. It makes the tracing format more portable and standard, while LangSmith remains the place where the traces are easiest to inspect.
 
-The notebook also clears stale `OTEL_EXPORTER_*` environment variables and explicitly sends trace spans to LangSmith's OTLP traces endpoint:
+## Where It Was Added
 
-```bash
-OTEL_EXPORTER_OTLP_ENDPOINT=https://api.smith.langchain.com/otel
-OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://api.smith.langchain.com/otel/v1/traces
-OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+The main integration is in the ticket prediction loop. Each time the classifier processes a ticket, the notebook creates a span named:
+
+```text
+customer_support.classify_ticket
 ```
 
-If the terminal shows `Failed to export span batch code: 404`, the classifier can still run, but the trace exporter is pointed at the wrong endpoint.
+That span includes:
 
-## Metadata Captured On Each Span
+- ticket id
+- run name, such as baseline or improved
+- prompt version
+- true support category
+- predicted support category
+- whether the prediction was correct
+- model reasoning
 
-- `eval.example_id`: ticket id
-- `eval.run_name`: baseline or improved
-- `eval.prompt_version`: v1 or v2
-- `eval.true_category`: ground-truth label
-- `eval.predicted_category`: model output
-- `eval.correct`: whether prediction matched the label
-- `eval.reasoning`: model explanation
-- `langsmith.span.kind`: chain
+This connects each row in the CSV results back to a trace in LangSmith.
 
-## What This Enables
+## Why It Helps Week 4
 
-When a ticket is misclassified, the CSV row can be connected to an exact trace. The trace shows the ticket, expected label, predicted label, prompt version, model reasoning, and child LLM call. This makes failure analysis more concrete than accuracy alone.
+The Week 4 assignment is about more than getting a higher score. It asks you to understand the model's mistakes, group failures, change the prompt, and compare the before-and-after results.
 
-For the Week 4 submission, this supports:
+OpenTelemetry helps because it gives evidence for that story:
 
-- baseline metrics
-- improved metrics
-- measured delta
-- trace-backed examples for failure clusters
-- evidence that a prompt change helped or caused regressions
+- You can inspect a failed ticket instead of only looking at aggregate accuracy.
+- You can compare baseline and improved runs using the same metadata.
+- You can explain why a prompt change helped one failure category.
+- You can also see where the change caused regressions.
 
-## Loom Talk Track
+## Endpoint Note
 
-"I am using OpenTelemetry as the tracing standard and LangSmith as the evaluation UI. The dataset gives us known correct labels. For each ticket, the classifier run becomes one OpenTelemetry span with the ticket id, expected label, predicted label, prompt version, and correctness. LangSmith receives those spans, so when accuracy or recall drops, I can click into the exact failed trace, inspect the model reasoning, cluster the failure, update the prompt, and rerun the same dataset. The final result is not just a better score; it is trace-backed evidence of what improved and what still fails."
+If the notebook prints:
+
+```text
+Failed to export span batch code: 404, reason: Not Found
+```
+
+that means the classifier ran, but traces were being sent to an incorrect OpenTelemetry endpoint.
+
+The notebook now points OpenTelemetry to LangSmith's OTLP trace endpoint:
+
+```text
+https://api.smith.langchain.com/otel/v1/traces
+```
+
+That fixes the trace export issue and keeps the eval workflow connected to LangSmith.
+
+## Short Talk Track
+
+"I used LangSmith as the AI eval and trace-inspection workspace, and OpenTelemetry as the standard tracing layer. Each customer ticket classification creates a span with the ticket id, prompt version, expected label, predicted label, correctness, and model reasoning. This lets me connect the accuracy results back to specific model traces, which makes the Week 4 failure analysis easier to explain."

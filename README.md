@@ -1,6 +1,6 @@
-# Week 4 AI Evals: Customer Support Agent Evaluation
+# Week 4 Project: Customer Support AI Evals
 
-This repository contains the Week 4 AI evaluation project for The Gen Academy. The project evaluates an e-commerce customer support routing agent that reads one customer ticket and predicts exactly one category:
+This repo contains the completed Week 4 AI Evals project for The Gen Academy. The project evaluates a customer support routing assistant that reads a customer ticket and predicts one support category:
 
 - `order_status`
 - `refund_request`
@@ -8,99 +8,73 @@ This repository contains the Week 4 AI evaluation project for The Gen Academy. T
 - `account_help`
 - `other`
 
-The goal is not just to report accuracy. The goal is to inspect failures, group them into useful failure categories, make one focused prompt improvement, rerun the evaluator, and measure the delta.
+The notebook is already executed, so you can open it and review the full workflow, outputs, metrics, and trace instrumentation without rerunning anything first.
 
-## Project Workflow
+## Start Here
 
-The project follows the Week 4 handout:
+Open:
 
-1. Inspect classifier failures.
-   - Filter failed rows.
-   - Add concrete annotations explaining why the classifier was wrong.
+```text
+week4_customer_support_evals.ipynb
+```
 
-2. Create failure categories.
-   - Group similar failures.
-   - Name each failure pattern.
-   - Label each failed row with one category.
+That notebook walks through the full Week 4 workflow:
 
-3. Tweak the classifier prompt.
-   - Pick one important failure category.
-   - Make one focused prompt change.
-   - Avoid rewriting the whole classifier prompt.
+1. Generate a labeled support-ticket dataset.
+2. Run a baseline classifier prompt.
+3. Evaluate predictions against the known labels.
+4. Inspect mistakes and group failure patterns.
+5. Improve the prompt based on one failure pattern.
+6. Rerun the eval and compare the results.
+7. Add OpenTelemetry tracing so individual ticket runs can be inspected in LangSmith.
 
-4. Rerun and compare.
-   - Compare baseline vs improved predictions.
-   - Track both wins and regressions.
-
-5. Optional: run LLM-as-a-judge.
-   - Choose one target failure category.
-   - Use a binary judge to classify whether each failed row belongs to that target category.
-   - Compare judge predictions against human labels.
-
-## Repository Assets
-
-| File | Purpose |
-| --- | --- |
-| `week4_customer_support_agent_evals.ipynb` | Main notebook. Builds the LangGraph classifier, enables LangSmith/OpenTelemetry tracing, generates predictions, evaluates metrics, and compares prompt versions. |
-| `week4_customer_support_agent_evals_executed.ipynb` | Executed notebook from the latest run. Includes generated outputs and metric summaries. |
-| `results_v1.csv` | Baseline prompt prediction results. |
-| `results_v2.csv` | Improved prompt prediction results. |
-| `docs/opentelemetry_integration_one_pager.md` | Short explanation of where OpenTelemetry was added and how it supports the Week 4 eval workflow. |
-
-## Latest Run Summary
-
-The latest executed notebook produced:
+## Results At A Glance
 
 | Run | Accuracy | Correct |
 | --- | ---: | ---: |
 | Baseline prompt | 92.00% | 92 / 100 |
 | Improved prompt | 97.00% | 97 / 100 |
-| Delta | +5.00% | +5 net correct |
+| Change | +5.00% | +5 net correct |
 
-Prediction changes between runs:
+The improved prompt reduced confusion between refund-related language, order-status issues, and product problems. It also exposed a few regressions, which is useful for Week 4 because the assignment is about understanding both improvements and tradeoffs.
 
-- 11 tickets changed prediction.
-- 8 changed from wrong to right.
-- 3 regressed from right to wrong.
+## Files In This Repo
 
-The baseline prompt mainly over-routed some `order_status` and `product_issue` tickets into `refund_request` when the customer mentioned money back or refund language. The improved prompt added clearer disambiguation rules for damaged/wrong items, non-delivery, and refund-status requests.
+| File | What It Is |
+| --- | --- |
+| `week4_customer_support_evals.ipynb` | Final executed notebook with the complete project workflow and outputs. |
+| `results_v1.csv` | Baseline prompt predictions and evaluation results. |
+| `results_v2.csv` | Improved prompt predictions and evaluation results. |
+| `docs/opentelemetry_integration_one_pager.md` | Short explanation of how OpenTelemetry was added to the project. |
 
-## OpenTelemetry Integration
+## How OpenTelemetry Fits
 
-The notebook uses LangSmith as the AI evaluation and trace inspection UI. OpenTelemetry is added as the standard tracing layer.
+LangSmith is used as the AI evaluation and trace-inspection workspace. OpenTelemetry is used as the standard tracing layer that sends structured spans into LangSmith.
 
-In `week4_customer_support_agent_evals.ipynb`, OpenTelemetry was added in three places:
+In this project, each ticket classification is wrapped in an OpenTelemetry span. The span records useful evaluation context, including:
 
-1. Dependencies:
-   - `langsmith[otel]`
-   - `opentelemetry-sdk`
-   - `opentelemetry-exporter-otlp`
+- ticket id
+- prompt version
+- expected category
+- predicted category
+- whether the model was correct
+- model reasoning
 
-2. Environment setup:
-   - `LANGSMITH_OTEL_ENABLED=true`
-   - `OTEL_SERVICE_NAME=customer-support-evals-notebook`
-   - `OTEL_EXPORTER_OTLP_ENDPOINT=https://api.smith.langchain.com/otel`
-   - `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://api.smith.langchain.com/otel/v1/traces`
-   - `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`
+This makes the eval easier to explain. Instead of only saying "accuracy improved," you can point to the exact ticket traces that show where the baseline failed, what the model reasoned, and how the improved prompt changed the outcome.
 
-3. Prediction loop:
-   - Each ticket classification is wrapped in a span named `customer_support.classify_ticket`.
-   - Each span records ticket-level evaluation metadata:
-     - `eval.example_id`
-     - `eval.run_name`
-     - `eval.prompt_version`
-     - `eval.true_category`
-     - `eval.predicted_category`
-     - `eval.correct`
-     - `eval.reasoning`
+If you see this warning while rerunning the notebook:
 
-This makes every CSV row traceable back to a LangSmith/OpenTelemetry run. When a row fails, you can inspect the exact trace, model reasoning, prompt version, and expected vs predicted label.
+```text
+Failed to export span batch code: 404, reason: Not Found
+```
 
-If you see `Failed to export span batch code: 404`, the notebook is still running the classifier, but OpenTelemetry is trying to export spans to an endpoint that does not exist. This usually means a stale or incorrect `OTEL_EXPORTER_*` value is present. The notebook clears those stale values and explicitly sets the LangSmith OTLP trace endpoint.
+the classifier is still running, but OpenTelemetry is trying to send traces to the wrong endpoint. The notebook now sets the LangSmith OTLP endpoint explicitly to avoid that issue.
 
-## Running The Notebook
+## Rerunning The Notebook
 
-Create a virtual environment and install dependencies:
+You only need to rerun the notebook if you want to regenerate results or create fresh traces in your own LangSmith project.
+
+Install the dependencies:
 
 ```bash
 python3 -m venv .venv
@@ -108,25 +82,21 @@ source .venv/bin/activate
 pip install langgraph "langsmith[otel]>=0.4.25" langchain-openai langchain-core pandas scikit-learn pydantic tqdm opentelemetry-sdk opentelemetry-exporter-otlp
 ```
 
-Set API keys locally:
+Set your own API keys locally:
 
 ```bash
-export OPENAI_API_KEY="..."
-export LANGSMITH_API_KEY="..."
+export OPENAI_API_KEY="your-openai-key"
+export LANGSMITH_API_KEY="your-langsmith-key"
 export LANGSMITH_TRACING=true
 export LANGSMITH_PROJECT=customer-support-evals
 export LANGSMITH_ENDPOINT=https://api.smith.langchain.com
 export LANGSMITH_OTEL_ENABLED=true
-export OTEL_SERVICE_NAME=customer-support-evals-notebook
-export OTEL_EXPORTER_OTLP_ENDPOINT=https://api.smith.langchain.com/otel
-export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://api.smith.langchain.com/otel/v1/traces
-export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 ```
 
-Then open and run:
+Then run:
 
 ```bash
-jupyter notebook week4_customer_support_agent_evals.ipynb
+jupyter notebook week4_customer_support_evals.ipynb
 ```
 
 Do not commit API keys, `.env` files, or local notebook secrets.
