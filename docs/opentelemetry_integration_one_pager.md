@@ -8,6 +8,19 @@ OpenTelemetry adds trace-level visibility to that workflow.
 
 In plain English: every ticket classification becomes a traceable event. That event records what the model was asked to do, what it predicted, what the correct answer was, and whether the prediction was right.
 
+## Vocabulary: What Is A Span?
+
+A `span` is one traceable unit of work.
+
+In this project, one span is created each time the classifier handles one customer ticket. If the notebook classifies 100 tickets, OpenTelemetry can create 100 spans.
+
+Each span acts like a timestamped record for one ticket classification. It can store the ticket id, prompt version, expected label, predicted label, correctness, model reasoning, timing, and status.
+
+A `trace` is the larger story that can contain one or more spans. For this Week 4 use case, the easiest way to explain it is:
+
+- span = one ticket classification
+- trace = the broader record that lets you inspect what happened
+
 ## OpenTelemetry vs. LangSmith
 
 LangSmith is the place where you inspect AI runs, prompts, model calls, and eval results.

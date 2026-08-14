@@ -49,7 +49,14 @@ The improved prompt reduced confusion between refund-related language, order-sta
 
 ## How OpenTelemetry Fits
 
-LangSmith is used as the AI evaluation and trace-inspection workspace. OpenTelemetry is used as the standard tracing layer that sends structured spans into LangSmith.
+LangSmith is used as the AI evaluation and trace-inspection workspace. OpenTelemetry is used as the standard tracing layer that sends structured records into LangSmith.
+
+The main vocabulary to know is:
+
+- A `span` is one traceable unit of work. In this project, one span equals one customer ticket classification.
+- A `trace` is the larger story that can contain one or more spans.
+
+Put another way: if the notebook classifies 100 tickets, OpenTelemetry can create 100 spans. Each span is like a timestamped record for one ticket, showing what happened during that classification.
 
 In this project, each ticket classification is wrapped in an OpenTelemetry span. The span records useful evaluation context, including:
 
