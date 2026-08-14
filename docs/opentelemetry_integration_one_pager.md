@@ -23,6 +23,16 @@ The best integration point is the `run_predictions(agent, tickets)` loop. That f
 
 The OpenTelemetry version wraps each ticket prediction in a span named `customer_support.classify_ticket`, then attaches evaluation metadata to that span.
 
+The notebook also clears stale `OTEL_EXPORTER_*` environment variables and explicitly sends trace spans to LangSmith's OTLP traces endpoint:
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=https://api.smith.langchain.com/otel
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://api.smith.langchain.com/otel/v1/traces
+OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+```
+
+If the terminal shows `Failed to export span batch code: 404`, the classifier can still run, but the trace exporter is pointed at the wrong endpoint.
+
 ## Metadata Captured On Each Span
 
 - `eval.example_id`: ticket id

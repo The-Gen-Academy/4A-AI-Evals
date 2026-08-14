@@ -41,8 +41,8 @@ The project follows the Week 4 handout:
 
 | File | Purpose |
 | --- | --- |
-| `customer_support_evals.ipynb` | Main notebook. Builds the LangGraph classifier, enables LangSmith/OpenTelemetry tracing, generates predictions, evaluates metrics, and compares prompt versions. |
-| `customer_support_evals_opentelemetry_executed.ipynb` | Executed notebook from the latest run. Includes generated outputs and metric summaries. |
+| `week4_customer_support_agent_evals.ipynb` | Main notebook. Builds the LangGraph classifier, enables LangSmith/OpenTelemetry tracing, generates predictions, evaluates metrics, and compares prompt versions. |
+| `week4_customer_support_agent_evals_executed.ipynb` | Executed notebook from the latest run. Includes generated outputs and metric summaries. |
 | `results_v1.csv` | Baseline prompt prediction results. |
 | `results_v2.csv` | Improved prompt prediction results. |
 | `docs/opentelemetry_integration_one_pager.md` | Short explanation of where OpenTelemetry was added and how it supports the Week 4 eval workflow. |
@@ -69,7 +69,7 @@ The baseline prompt mainly over-routed some `order_status` and `product_issue` t
 
 The notebook uses LangSmith as the AI evaluation and trace inspection UI. OpenTelemetry is added as the standard tracing layer.
 
-In `customer_support_evals.ipynb`, OpenTelemetry was added in three places:
+In `week4_customer_support_agent_evals.ipynb`, OpenTelemetry was added in three places:
 
 1. Dependencies:
    - `langsmith[otel]`
@@ -79,6 +79,9 @@ In `customer_support_evals.ipynb`, OpenTelemetry was added in three places:
 2. Environment setup:
    - `LANGSMITH_OTEL_ENABLED=true`
    - `OTEL_SERVICE_NAME=customer-support-evals-notebook`
+   - `OTEL_EXPORTER_OTLP_ENDPOINT=https://api.smith.langchain.com/otel`
+   - `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://api.smith.langchain.com/otel/v1/traces`
+   - `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`
 
 3. Prediction loop:
    - Each ticket classification is wrapped in a span named `customer_support.classify_ticket`.
@@ -92,6 +95,8 @@ In `customer_support_evals.ipynb`, OpenTelemetry was added in three places:
      - `eval.reasoning`
 
 This makes every CSV row traceable back to a LangSmith/OpenTelemetry run. When a row fails, you can inspect the exact trace, model reasoning, prompt version, and expected vs predicted label.
+
+If you see `Failed to export span batch code: 404`, the notebook is still running the classifier, but OpenTelemetry is trying to export spans to an endpoint that does not exist. This usually means a stale or incorrect `OTEL_EXPORTER_*` value is present. The notebook clears those stale values and explicitly sets the LangSmith OTLP trace endpoint.
 
 ## Running The Notebook
 
@@ -113,12 +118,15 @@ export LANGSMITH_PROJECT=customer-support-evals
 export LANGSMITH_ENDPOINT=https://api.smith.langchain.com
 export LANGSMITH_OTEL_ENABLED=true
 export OTEL_SERVICE_NAME=customer-support-evals-notebook
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://api.smith.langchain.com/otel
+export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://api.smith.langchain.com/otel/v1/traces
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 ```
 
 Then open and run:
 
 ```bash
-jupyter notebook customer_support_evals.ipynb
+jupyter notebook week4_customer_support_agent_evals.ipynb
 ```
 
 Do not commit API keys, `.env` files, or local notebook secrets.
